@@ -1,9 +1,17 @@
 import { Button } from "@/components/ui/button";
-import { Briefcase, Plus, User } from "lucide-react";
+import { Briefcase, Plus, User, LogOut, LayoutDashboard } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export const Header = () => {
   const navigate = useNavigate();
+  const { user, signOut } = useAuth();
 
   return (
     <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
@@ -24,6 +32,11 @@ export const Header = () => {
           <Button variant="ghost" onClick={() => navigate("/browse")}>
             Browse Jobs
           </Button>
+          {user && (
+            <Button variant="ghost" onClick={() => navigate("/dashboard")}>
+              Dashboard
+            </Button>
+          )}
           <Button variant="ghost" onClick={() => navigate("/post-job")}>
             Post a Job
           </Button>
@@ -39,9 +52,30 @@ export const Header = () => {
             <Plus className="w-4 h-4 mr-1" />
             Post Job
           </Button>
-          <Button variant="ghost" size="icon">
-            <User className="w-5 h-5" />
-          </Button>
+          
+          {user ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <User className="w-5 h-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => navigate("/dashboard")}>
+                  <LayoutDashboard className="w-4 h-4 mr-2" />
+                  Dashboard
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={signOut}>
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Sign Out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <Button variant="ghost" size="icon" onClick={() => navigate("/auth")}>
+              <User className="w-5 h-5" />
+            </Button>
+          )}
         </div>
       </div>
     </header>

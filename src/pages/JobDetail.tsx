@@ -1,31 +1,139 @@
 import { useParams, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { MapPin, DollarSign, Clock, User, ArrowLeft } from "lucide-react";
+import { MapPin, DollarSign, Clock, User, ArrowLeft, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-
-// Mock data - would come from backend
-const mockJobData: Record<string, any> = {
-  "1": {
-    title: "Math Tutor Needed",
-    category: "Tutoring",
-    location: "Downtown",
-    pay: "$20/hour",
-    duration: "2-3 hours/week",
-    description: "Looking for a patient math tutor for high school algebra. The student is in 10th grade and needs help with algebra concepts, homework, and test preparation. We prefer someone with teaching experience or strong math background. Flexible schedule - can work around the tutor's availability. Sessions can be at our home or local library.",
-    postedBy: "Sarah M.",
-    requirements: ["Strong math skills", "Patient and encouraging", "Flexible schedule"],
-  },
-};
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function JobDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
-  
-  const job = mockJobData[id || "1"];
+  const { user } = useAuth();
+  const [job, setJob] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [isSeeker, setIsSeeker] = useState(false);
+  const [hasApplied, setHasApplied] = useState(false);
+  const [applying, setApplying] = useState(false);
+
+  useEffect(() => {
+    if (id) {
+      fetchJob();
+    }
+  }, [id]);
+
+  useEffect(() => {
+    if (user && id) {
+      checkUserRole();
+      checkApplicationStatus();
+    }
+  }, [user, id]);
+
+  const fetchJob = async () => {
+    const { data, error } = await supabase
+      .from('jobs')
+      .select(`
+        *,
+        profiles!jobs_poster_id_fkey (name)
+      `)
+      .eq('id', id)
+      .single();
+
+    if (error || !data) {
+      toast({
+        title: "Error",
+        description: "Job not found",
+        variant: "destructive"
+      });
+      navigate("/browse");
+    } else {
+      setJob(data);
+    }
+    setLoading(false);
+  };
+
+  const checkUserRole = async () => {
+    const { data } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user?.id)
+      .single();
+
+    setIsSeeker(data?.role === 'job_seeker');
+  };
+
+  const checkApplicationStatus = async () => {
+    const { data } = await supabase
+      .from('applications')
+      .select('id')
+      .eq('job_id', id)
+      .eq('seeker_id', user?.id)
+      .maybeSingle();
+
+    setHasApplied(!!data);
+  };
+
+  const handleApply = async () => {
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "Please sign in to apply for jobs",
+        variant: "destructive"
+      });
+      navigate("/auth");
+      return;
+    }
+
+    if (!isSeeker) {
+      toast({
+        title: "Error",
+        description: "You must be a job seeker to apply for jobs",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setApplying(true);
+
+    const { error } = await supabase
+      .from('applications')
+      .insert({
+        job_id: id,
+        seeker_id: user.id,
+        status: 'pending'
+      });
+
+    setApplying(false);
+
+    if (error) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive"
+      });
+    } else {
+      toast({
+        title: "Application Submitted!",
+        description: "The job poster will contact you soon.",
+      });
+      setHasApplied(true);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </div>
+    );
+  }
 
   if (!job) {
     return (
@@ -40,13 +148,6 @@ export default function JobDetail() {
       </div>
     );
   }
-
-  const handleApply = () => {
-    toast({
-      title: "Application Submitted!",
-      description: "The job poster will contact you soon.",
-    });
-  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -81,29 +182,18 @@ export default function JobDetail() {
                   </div>
                   <div className="flex items-center gap-2">
                     <DollarSign className="w-5 h-5 text-secondary" />
-                    <span className="font-bold text-secondary">{job.pay}</span>
+                    <span className="font-bold text-secondary">${job.pay}/hour</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Clock className="w-5 h-5 text-muted-foreground" />
-                    <span>{job.duration}</span>
+                    <span>Posted {new Date(job.created_at).toLocaleDateString()}</span>
                   </div>
                 </div>
 
                 <div>
                   <h3 className="text-xl font-semibold mb-3">Description</h3>
-                  <p className="text-muted-foreground leading-relaxed">{job.description}</p>
+                  <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap">{job.description}</p>
                 </div>
-
-                {job.requirements && (
-                  <div>
-                    <h3 className="text-xl font-semibold mb-3">Requirements</h3>
-                    <ul className="list-disc list-inside space-y-2 text-muted-foreground">
-                      {job.requirements.map((req: string, index: number) => (
-                        <li key={index}>{req}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
               </CardContent>
             </Card>
           </div>
@@ -118,17 +208,31 @@ export default function JobDetail() {
                   <User className="w-10 h-10 p-2 rounded-full bg-primary text-primary-foreground" />
                   <div>
                     <p className="font-semibold">Posted by</p>
-                    <p className="text-sm text-muted-foreground">{job.postedBy}</p>
+                    <p className="text-sm text-muted-foreground">{job.profiles?.name || 'Anonymous'}</p>
                   </div>
                 </div>
                 
-                <Button 
-                  className="w-full" 
-                  size="lg"
-                  onClick={handleApply}
-                >
-                  Apply Now
-                </Button>
+                {hasApplied ? (
+                  <Button className="w-full" size="lg" disabled>
+                    Already Applied
+                  </Button>
+                ) : (
+                  <Button 
+                    className="w-full" 
+                    size="lg"
+                    onClick={handleApply}
+                    disabled={applying || !isSeeker}
+                  >
+                    {applying && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    {user ? 'Apply Now' : 'Sign In to Apply'}
+                  </Button>
+                )}
+                
+                {!isSeeker && user && (
+                  <p className="text-xs text-destructive text-center">
+                    You need a job seeker account to apply for jobs
+                  </p>
+                )}
                 
                 <p className="text-xs text-muted-foreground text-center">
                   By applying, you agree to share your contact information with the job poster.

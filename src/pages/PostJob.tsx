@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,27 +8,110 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { Loader2 } from "lucide-react";
 
 export default function PostJob() {
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isPoster, setIsPoster] = useState(false);
   const [formData, setFormData] = useState({
     title: "",
     category: "",
     location: "",
     pay: "",
-    duration: "",
     description: "",
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    toast({
-      title: "Job Posted Successfully!",
-      description: "Your job listing is now live. You'll be notified when someone applies.",
-    });
-    navigate("/browse");
+  useEffect(() => {
+    if (!authLoading && !user) {
+      toast({
+        title: "Authentication required",
+        description: "Please sign in to post a job",
+        variant: "destructive"
+      });
+      navigate("/auth");
+    }
+  }, [user, authLoading, navigate]);
+
+  useEffect(() => {
+    if (user) {
+      checkUserRole();
+    }
+  }, [user]);
+
+  const checkUserRole = async () => {
+    const { data } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user?.id)
+      .single();
+
+    setIsPoster(data?.role === 'job_poster');
   };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!user) {
+      toast({
+        title: "Error",
+        description: "You must be signed in to post a job",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!isPoster) {
+      toast({
+        title: "Error",
+        description: "You must be a job poster to create jobs",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    const { error } = await supabase
+      .from('jobs')
+      .insert({
+        poster_id: user.id,
+        title: formData.title,
+        description: formData.description,
+        category: formData.category,
+        location: formData.location,
+        pay: parseFloat(formData.pay),
+        status: 'open'
+      });
+
+    setIsSubmitting(false);
+
+    if (error) {
+      toast({
+        title: "Error posting job",
+        description: error.message,
+        variant: "destructive"
+      });
+    } else {
+      toast({
+        title: "Job Posted Successfully!",
+        description: "Your job listing is now live. You'll be notified when someone applies.",
+      });
+      navigate("/dashboard");
+    }
+  };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -57,6 +140,7 @@ export default function PostJob() {
                     value={formData.title}
                     onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                     required
+                    disabled={isSubmitting}
                   />
                 </div>
 
@@ -66,6 +150,7 @@ export default function PostJob() {
                     value={formData.category}
                     onValueChange={(value) => setFormData({ ...formData, category: value })}
                     required
+                    disabled={isSubmitting}
                   >
                     <SelectTrigger id="category">
                       <SelectValue placeholder="Select a category" />
@@ -90,30 +175,23 @@ export default function PostJob() {
                       value={formData.location}
                       onChange={(e) => setFormData({ ...formData, location: e.target.value })}
                       required
+                      disabled={isSubmitting}
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="pay">Pay Rate *</Label>
+                    <Label htmlFor="pay">Pay Rate ($/hour) *</Label>
                     <Input
                       id="pay"
-                      placeholder="e.g., $20/hour"
+                      type="number"
+                      step="0.01"
+                      placeholder="e.g., 20"
                       value={formData.pay}
                       onChange={(e) => setFormData({ ...formData, pay: e.target.value })}
                       required
+                      disabled={isSubmitting}
                     />
                   </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="duration">Duration/Schedule *</Label>
-                  <Input
-                    id="duration"
-                    placeholder="e.g., 2-3 hours/week"
-                    value={formData.duration}
-                    onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
-                    required
-                  />
                 </div>
 
                 <div className="space-y-2">
@@ -125,6 +203,7 @@ export default function PostJob() {
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                     rows={6}
                     required
+                    disabled={isSubmitting}
                   />
                   <p className="text-xs text-muted-foreground">
                     Include requirements, expectations, and any other relevant details.
@@ -132,17 +211,25 @@ export default function PostJob() {
                 </div>
 
                 <div className="flex gap-4">
-                  <Button type="submit" className="flex-1">
+                  <Button type="submit" className="flex-1" disabled={isSubmitting || !isPoster}>
+                    {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Post Job
                   </Button>
                   <Button 
                     type="button" 
                     variant="outline"
                     onClick={() => navigate("/")}
+                    disabled={isSubmitting}
                   >
                     Cancel
                   </Button>
                 </div>
+
+                {!isPoster && user && (
+                  <p className="text-sm text-destructive">
+                    You need a job poster account to post jobs. Please create a new account as a job poster.
+                  </p>
+                )}
               </form>
             </CardContent>
           </Card>

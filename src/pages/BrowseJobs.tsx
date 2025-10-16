@@ -1,84 +1,72 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Header } from "@/components/Header";
 import { JobCard } from "@/components/JobCard";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search } from "lucide-react";
-
-// Mock data
-const mockJobs = [
-  {
-    id: "1",
-    title: "Math Tutor Needed",
-    category: "Tutoring",
-    location: "Downtown",
-    pay: "$20/hour",
-    duration: "2-3 hours/week",
-    description: "Looking for a patient math tutor for high school algebra. Flexible schedule.",
-    postedBy: "Sarah M.",
-  },
-  {
-    id: "2",
-    title: "Weekend Garden Maintenance",
-    category: "Gardening",
-    location: "Suburbs",
-    pay: "$50/session",
-    duration: "3-4 hours",
-    description: "Need help with lawn mowing, weeding, and basic garden maintenance every weekend.",
-    postedBy: "John D.",
-  },
-  {
-    id: "3",
-    title: "House Cleaning Service",
-    category: "Cleaning",
-    location: "City Center",
-    pay: "$30/hour",
-    duration: "4 hours",
-    description: "Looking for thorough house cleaning service. Bi-weekly basis.",
-    postedBy: "Lisa K.",
-  },
-  {
-    id: "4",
-    title: "Package Delivery Helper",
-    category: "Delivery",
-    location: "Various",
-    pay: "$15/delivery",
-    duration: "Flexible",
-    description: "Need reliable person for local package deliveries. Own transport preferred.",
-    postedBy: "Mike's Store",
-  },
-  {
-    id: "5",
-    title: "Guitar Lessons",
-    category: "Tutoring",
-    location: "Eastside",
-    pay: "$25/hour",
-    duration: "1 hour/week",
-    description: "Beginner looking for guitar lessons. Acoustic guitar, basic chords and songs.",
-    postedBy: "Tom R.",
-  },
-  {
-    id: "6",
-    title: "Furniture Assembly",
-    category: "Handyman",
-    location: "Northside",
-    pay: "$40/job",
-    duration: "2 hours",
-    description: "Need help assembling IKEA furniture. Tools will be provided.",
-    postedBy: "Emma S.",
-  },
-];
+import { Search, Loader2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function BrowseJobs() {
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [jobs, setJobs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const filteredJobs = mockJobs.filter((job) => {
+  useEffect(() => {
+    fetchJobs();
+    
+    // Set up real-time subscription
+    const channel = supabase
+      .channel('jobs-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'jobs'
+        },
+        () => {
+          fetchJobs();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  const fetchJobs = async () => {
+    const { data } = await supabase
+      .from('jobs')
+      .select(`
+        *,
+        profiles!jobs_poster_id_fkey (name)
+      `)
+      .eq('status', 'open')
+      .order('created_at', { ascending: false });
+
+    setJobs(data || []);
+    setLoading(false);
+  };
+
+  const filteredJobs = jobs.filter((job) => {
     const matchesSearch = job.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          job.description.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = categoryFilter === "all" || job.category === categoryFilter;
     return matchesSearch && matchesCategory;
   });
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -112,6 +100,7 @@ export default function BrowseJobs() {
               <SelectItem value="Cleaning">Cleaning</SelectItem>
               <SelectItem value="Delivery">Delivery</SelectItem>
               <SelectItem value="Handyman">Handyman</SelectItem>
+              <SelectItem value="Other">Other</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -119,7 +108,17 @@ export default function BrowseJobs() {
         {/* Results */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredJobs.map((job) => (
-            <JobCard key={job.id} {...job} />
+            <JobCard 
+              key={job.id} 
+              id={job.id}
+              title={job.title}
+              category={job.category}
+              location={job.location}
+              pay={`$${job.pay}/hour`}
+              duration={job.created_at}
+              description={job.description}
+              postedBy={job.profiles?.name || 'Anonymous'}
+            />
           ))}
         </div>
 
