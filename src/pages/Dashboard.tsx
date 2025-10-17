@@ -28,7 +28,6 @@ export default function Dashboard() {
   useEffect(() => {
     if (user) {
       fetchUserRole();
-      setupRealtimeSubscription();
     }
   }, [user]);
 
@@ -39,41 +38,40 @@ export default function Dashboard() {
       } else {
         fetchMyApplications();
       }
+      
+      // Set up real-time subscription AFTER userRole is known
+      const channel = supabase
+        .channel('dashboard-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'jobs'
+          },
+          () => {
+            if (userRole === 'job_poster') fetchMyJobs();
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'applications'
+          },
+          () => {
+            if (userRole === 'job_poster') fetchMyJobs();
+            else fetchMyApplications();
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
     }
   }, [userRole, user]);
-
-  const setupRealtimeSubscription = () => {
-    const channel = supabase
-      .channel('dashboard-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'jobs'
-        },
-        () => {
-          if (userRole === 'job_poster') fetchMyJobs();
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'applications'
-        },
-        () => {
-          if (userRole === 'job_poster') fetchMyJobs();
-          else fetchMyApplications();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  };
 
   const fetchUserRole = async () => {
     const { data } = await supabase
@@ -89,7 +87,7 @@ export default function Dashboard() {
 
   const fetchMyJobs = async () => {
     setLoading(true);
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('jobs')
       .select(`
         *,
@@ -97,11 +95,20 @@ export default function Dashboard() {
           id,
           status,
           seeker_id,
-          profiles!applications_seeker_id_fkey (name)
+          profiles (name)
         )
       `)
       .eq('poster_id', user?.id)
       .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching jobs:', error);
+      toast({
+        title: "Error loading jobs",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
 
     setJobs(data || []);
     setLoading(false);

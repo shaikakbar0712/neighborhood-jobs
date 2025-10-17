@@ -37,14 +37,18 @@ export default function BrowseJobs() {
   }, []);
 
   const fetchJobs = async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('jobs')
       .select(`
         *,
-        profiles!jobs_poster_id_fkey (name)
+        profiles (name)
       `)
       .eq('status', 'open')
       .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching jobs:', error);
+    }
 
     setJobs(data || []);
     setLoading(false);
