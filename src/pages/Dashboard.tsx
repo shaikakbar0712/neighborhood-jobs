@@ -95,7 +95,7 @@ export default function Dashboard() {
           id,
           status,
           seeker_id,
-          profiles (name)
+          profiles!applications_seeker_id_fkey (name)
         )
       `)
       .eq('poster_id', user?.id)
