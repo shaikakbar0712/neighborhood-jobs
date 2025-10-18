@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Briefcase, Clock, CheckCircle, XCircle } from 'lucide-react';
+import { Loader2, Briefcase, Clock, CheckCircle, XCircle, Star } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export default function Dashboard() {
@@ -95,7 +95,7 @@ export default function Dashboard() {
           id,
           status,
           seeker_id,
-          profiles!fk_applications_seeker_profile (name)
+          profiles (name)
         )
       `)
       .eq('poster_id', user?.id)
@@ -236,25 +236,34 @@ export default function Dashboard() {
                               <p className="font-medium">{app.profiles?.name}</p>
                               <Badge variant="outline" className="mt-1">{app.status}</Badge>
                             </div>
-                            {app.status === 'pending' && (
-                              <div className="flex gap-2">
-                                <Button
-                                  size="sm"
-                                  onClick={() => updateApplicationStatus(app.id, 'accepted')}
-                                >
-                                  <CheckCircle className="w-4 h-4 mr-1" />
-                                  Accept
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="destructive"
-                                  onClick={() => updateApplicationStatus(app.id, 'rejected')}
-                                >
-                                  <XCircle className="w-4 h-4 mr-1" />
-                                  Reject
-                                </Button>
-                              </div>
-                            )}
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => navigate(`/reviews?userId=${app.seeker_id}`)}
+                              >
+                                <Star className="w-4 h-4" />
+                              </Button>
+                              {app.status === 'pending' && (
+                                <>
+                                  <Button
+                                    size="sm"
+                                    onClick={() => updateApplicationStatus(app.id, 'accepted')}
+                                  >
+                                    <CheckCircle className="w-4 h-4 mr-1" />
+                                    Accept
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    onClick={() => updateApplicationStatus(app.id, 'rejected')}
+                                  >
+                                    <XCircle className="w-4 h-4 mr-1" />
+                                    Reject
+                                  </Button>
+                                </>
+                              )}
+                            </div>
                           </div>
                         ))}
                       </div>

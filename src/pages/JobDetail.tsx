@@ -4,7 +4,7 @@ import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { MapPin, DollarSign, Clock, User, ArrowLeft, Loader2, Phone, Mail } from "lucide-react";
+import { MapPin, DollarSign, Clock, User, ArrowLeft, Loader2, Phone, Mail, Star } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -231,6 +231,15 @@ export default function JobDetail() {
                     </div>
                   )}
                 </div>
+                
+                <Button
+                  variant="outline"
+                  onClick={() => navigate(`/reviews?userId=${job.poster_id}`)}
+                  className="w-full"
+                >
+                  <Star className="w-4 h-4 mr-2" />
+                  View Reviews
+                </Button>
                 
                 {hasApplied ? (
                   <Button className="w-full" size="lg" disabled>
