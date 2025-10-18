@@ -38,7 +38,7 @@ export default function JobDetail() {
       .from('jobs')
       .select(`
         *,
-        profiles!jobs_poster_id_fkey (name)
+        profiles (name)
       `)
       .eq('id', id)
       .single();
