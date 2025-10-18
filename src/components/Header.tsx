@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Briefcase, Plus, User, LogOut, LayoutDashboard } from "lucide-react";
+import { Briefcase, Plus, User, LogOut, LayoutDashboard, Edit } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -64,6 +64,10 @@ export const Header = () => {
                 <DropdownMenuItem onClick={() => navigate("/dashboard")}>
                   <LayoutDashboard className="w-4 h-4 mr-2" />
                   Dashboard
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate("/edit-profile")}>
+                  <Edit className="w-4 h-4 mr-2" />
+                  Edit Profile
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={signOut}>
                   <LogOut className="w-4 h-4 mr-2" />

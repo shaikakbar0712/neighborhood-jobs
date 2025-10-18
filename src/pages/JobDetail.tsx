@@ -4,7 +4,7 @@ import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { MapPin, DollarSign, Clock, User, ArrowLeft, Loader2 } from "lucide-react";
+import { MapPin, DollarSign, Clock, User, ArrowLeft, Loader2, Phone, Mail } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -38,7 +38,7 @@ export default function JobDetail() {
       .from('jobs')
       .select(`
         *,
-        profiles (name)
+        profiles (name, phone, email)
       `)
       .eq('id', id)
       .single();
@@ -204,12 +204,32 @@ export default function JobDetail() {
                 <CardTitle>Apply for this job</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
-                  <User className="w-10 h-10 p-2 rounded-full bg-primary text-primary-foreground" />
-                  <div>
-                    <p className="font-semibold">Posted by</p>
-                    <p className="text-sm text-muted-foreground">{job.profiles?.name || 'Anonymous'}</p>
+                <div className="space-y-3 p-4 bg-muted rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <User className="w-10 h-10 p-2 rounded-full bg-primary text-primary-foreground" />
+                    <div>
+                      <p className="font-semibold">Posted by</p>
+                      <p className="text-sm text-muted-foreground">{job.profiles?.name || 'Anonymous'}</p>
+                    </div>
                   </div>
+                  
+                  {job.profiles?.phone && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <Phone className="w-4 h-4 text-muted-foreground" />
+                      <a href={`tel:${job.profiles.phone}`} className="text-primary hover:underline">
+                        {job.profiles.phone}
+                      </a>
+                    </div>
+                  )}
+                  
+                  {job.profiles?.email && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <Mail className="w-4 h-4 text-muted-foreground" />
+                      <a href={`mailto:${job.profiles.email}`} className="text-primary hover:underline">
+                        {job.profiles.email}
+                      </a>
+                    </div>
+                  )}
                 </div>
                 
                 {hasApplied ? (
